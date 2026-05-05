@@ -14,6 +14,9 @@
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        #banner-slider { scroll-behavior: smooth; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+        #banner-slider img { flex-shrink: 0; width: 100%; scroll-snap-align: start; }
     </style>
 </head>
 <body class="pb-24">
@@ -23,9 +26,25 @@
         <div id="install-btn" class="hidden bg-blue-600 px-4 py-2 rounded-full text-[10px] font-black uppercase cursor-pointer">Install App</div>
     </div>
 
-    <div id="banner-slider" class="flex overflow-x-auto gap-4 p-5 no-scrollbar"></div>
+    <div class="p-5 space-y-4">
+        <div class="flex gap-2">
+            <input type="text" id="search-input" onkeyup="searchFn()" placeholder="Search products..." class="flex-1 glass p-4 rounded-2xl outline-none text-xs">
+            <button class="glass p-4 rounded-2xl"><i class="fa-solid fa-sliders"></i></button>
+        </div>
 
-    <div id="product-list" class="grid grid-cols-2 gap-4 px-5"></div>
+        <div id="banner-slider" class="no-scrollbar rounded-[2rem] border border-white/5 shadow-2xl"></div>
+
+        <div class="flex justify-between px-2 text-[10px] font-black uppercase tracking-widest opacity-60">
+            <button onclick="alert('Wishlist coming soon')"><i class="fa-solid fa-heart text-red-500 mr-1"></i> Wishlist</button>
+            <button onclick="alert('My Orders coming soon')"><i class="fa-solid fa-bag-shopping text-blue-500 mr-1"></i> My Orders</button>
+        </div>
+
+        <div id="cats" class="flex gap-3 overflow-x-auto no-scrollbar py-2">
+            <button class="glass px-6 py-3 rounded-xl text-[10px] font-black uppercase border-blue-500">All</button>
+        </div>
+
+        <div id="product-list" class="grid grid-cols-2 gap-4"></div>
+    </div>
 
     <script>
         const firebaseConfig = { 
@@ -37,36 +56,44 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Load Banners & Products
+        // Banners & Auto-Slide Logic
+        function startSlide() {
+            const s = document.getElementById('banner-slider');
+            let i = 0;
+            setInterval(() => {
+                i = (i + 1) % s.children.length;
+                s.scrollTo({ left: i * s.clientWidth, behavior: 'smooth' });
+            }, 3000);
+        }
+
         db.collection('banners').onSnapshot(s => {
-            document.getElementById('banner-slider').innerHTML = s.docs.map(d => `<img src="${d.data().url}" class="min-w-[85%] h-44 object-cover rounded-[2rem] border border-white/5">`).join('');
+            document.getElementById('banner-slider').innerHTML = s.docs.map(d => `<img src="${d.data().url}" class="h-44 object-cover">`).join('');
+            if(s.docs.length > 0) startSlide();
         });
+
+        // Load Products & Buy Logic
         db.collection('products').onSnapshot(s => {
             document.getElementById('product-list').innerHTML = s.docs.map(d => `
-                <div class="glass p-3 rounded-[2rem] space-y-3">
+                <div class="glass p-3 rounded-[2rem] space-y-3" onclick="location.href='product.html?id=${d.id}'">
                     <img src="${d.data().img1}" class="w-full h-40 object-cover rounded-[1.5rem]">
-                    <div class="text-center">
+                    <div class="text-center px-1">
                         <h3 class="text-[10px] font-extrabold uppercase truncate">${d.data().name}</h3>
                         <p class="text-blue-500 font-black text-xs">₹${d.data().price}</p>
+                        <button class="w-full bg-white/5 border border-white/5 mt-3 py-2.5 rounded-xl text-[9px] font-black uppercase">Buy Now</button>
                     </div>
                 </div>
             `).join('');
         });
 
-        // PWA & Notifications Support
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.getElementById('install-btn').classList.remove('hidden');
-        });
-
-        document.getElementById('install-btn').onclick = () => {
-            if (deferredPrompt) deferredPrompt.prompt();
-        };
+        // PWA Install & Push
+        let defP;
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); defP = e; document.getElementById('install-btn').classList.remove('hidden'); });
+        document.getElementById('install-btn').onclick = () => { if(defP) defP.prompt(); };
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('firebase-messaging-sw.js');
+            navigator.serviceWorker.register('firebase-messaging-sw.js').then(reg => {
+                Notification.requestPermission();
+            });
         }
     </script>
 </body>
