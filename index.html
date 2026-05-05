@@ -14,21 +14,18 @@
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="pb-24">
 
     <div class="sticky top-0 z-50 glass p-5 flex justify-between items-center border-b border-white/5">
-        <h1 class="font-black italic uppercase text-sm tracking-tighter">Thrilok <span class="text-blue-500 text-[10px]">Hub</span></h1>
-        <div id="install-btn" class="hidden bg-blue-600 px-4 py-2 rounded-full text-[10px] font-black uppercase animate-bounce cursor-pointer">Install App</div>
+        <h1 class="font-black italic uppercase text-sm">Thrilok <span class="text-blue-500">Hub</span></h1>
+        <div id="install-btn" class="hidden bg-blue-600 px-4 py-2 rounded-full text-[10px] font-black uppercase cursor-pointer">Install App</div>
     </div>
 
-    <div id="banner-slider" class="flex overflow-x-auto gap-4 p-5 no-scrollbar scroll-smooth snap-x">
-        </div>
+    <div id="banner-slider" class="flex overflow-x-auto gap-4 p-5 no-scrollbar"></div>
 
-    <div id="product-list" class="grid grid-cols-2 gap-4 px-5">
-        </div>
+    <div id="product-list" class="grid grid-cols-2 gap-4 px-5"></div>
 
     <script>
         const firebaseConfig = { 
@@ -40,7 +37,23 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // PWA Install Logic
+        // Load Banners & Products
+        db.collection('banners').onSnapshot(s => {
+            document.getElementById('banner-slider').innerHTML = s.docs.map(d => `<img src="${d.data().url}" class="min-w-[85%] h-44 object-cover rounded-[2rem] border border-white/5">`).join('');
+        });
+        db.collection('products').onSnapshot(s => {
+            document.getElementById('product-list').innerHTML = s.docs.map(d => `
+                <div class="glass p-3 rounded-[2rem] space-y-3">
+                    <img src="${d.data().img1}" class="w-full h-40 object-cover rounded-[1.5rem]">
+                    <div class="text-center">
+                        <h3 class="text-[10px] font-extrabold uppercase truncate">${d.data().name}</h3>
+                        <p class="text-blue-500 font-black text-xs">₹${d.data().price}</p>
+                    </div>
+                </div>
+            `).join('');
+        });
+
+        // PWA & Notifications Support
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -48,40 +61,14 @@
             document.getElementById('install-btn').classList.remove('hidden');
         });
 
-        document.getElementById('install-btn').addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') document.getElementById('install-btn').classList.add('hidden');
-            }
-        });
+        document.getElementById('install-btn').onclick = () => {
+            if (deferredPrompt) deferredPrompt.prompt();
+        };
 
-        // Service Worker & Notifications
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('firebase-messaging-sw.js').then(reg => {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') console.log("Notifications Active");
-                });
-            });
+            navigator.serviceWorker.register('firebase-messaging-sw.js');
         }
-
-        // Live Data Loading (Banners & Products)
-        db.collection('banners').onSnapshot(s => {
-            document.getElementById('banner-slider').innerHTML = s.docs.map(d => `<img src="${d.data().url}" class="min-w-[85%] h-44 object-cover rounded-[2rem] snap-center border border-white/5">`).join('');
-        });
-
-        db.collection('products').onSnapshot(s => {
-            document.getElementById('product-list').innerHTML = s.docs.map(d => `
-                <div class="glass p-3 rounded-[2rem] space-y-3">
-                    <img src="${d.data().img1}" class="w-full h-40 object-cover rounded-[1.5rem]">
-                    <div class="px-1 text-center">
-                        <h3 class="text-[10px] font-extrabold uppercase truncate">${d.data().name}</h3>
-                        <p class="text-blue-500 font-black text-xs mt-1">₹${d.data().price}</p>
-                        <button class="w-full bg-white/5 border border-white/5 mt-3 py-2.5 rounded-xl text-[9px] font-black uppercase">Buy Now</button>
-                    </div>
-                </div>
-            `).join('');
-        });
     </script>
 </body>
 </html>
+
